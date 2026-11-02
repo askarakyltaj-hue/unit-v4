@@ -50,14 +50,17 @@ export function shortName(name: string): string {
   return out.length > 32 ? `${out.slice(0, 31)}…` : out;
 }
 
-export function reminderText(name: string, pct: number | null, opts: { kind?: ReminderKind; firstName?: string | null; stock?: number | null } = {}): string {
+/**
+ * Текст пуша. С большой картинкой Android показывает только ~2 строки (≈70 знаков), поэтому скидку
+ * не повторяем — она уже в заголовке; в тексте только имя, товар и одно короткое действие.
+ */
+export function reminderText(name: string, _pct: number | null, opts: { kind?: ReminderKind; firstName?: string | null; stock?: number | null } = {}): string {
   const n = shortName(name);
   const lead = opts.kind === 'view'
     ? `${opts.firstName ? `${opts.firstName}, вы` : 'Вы'} смотрели: ${n}.`
     : `${opts.firstName ? `${opts.firstName}, у вас` : 'У вас'} в корзине: ${n}.`;
   const low = opts.stock != null && opts.stock > 0 && opts.stock <= LOW_STOCK;
-  const parts = [pct ? `Скидка ${pct}%` : null, low ? `осталось ${opts.stock} шт.` : null].filter(Boolean).join(', ');
-  return parts ? `${lead} ${parts.charAt(0).toUpperCase()}${parts.slice(1)} — успейте купить` : `${lead} Успейте купить`;
+  return low ? `${lead} Осталось ${opts.stock} шт.` : `${lead} Успейте купить`;
 }
 
 /** Заголовок пуша: как у Coupang — сразу выгода (название приложения телефон пишет сам). */
@@ -159,7 +162,7 @@ export async function runReminderKind(kind: ReminderKind, now = new Date()): Pro
         body: reminderText(product.name, pct, { kind, firstName, stock: product.shopStock }),
         imageUrl: firstImage(product),
         tokens: [rec.token],
-        data: { type: cfg.dataType, screen: 'product', productId: String(product.id), sku: String(product.sku), shopArticle: String(product.shopArticle ?? '') },
+        data: { type: cfg.dataType, screen: kind === 'cart' ? 'cart' : 'product', productId: String(product.id), sku: String(product.sku), shopArticle: String(product.shopArticle ?? '') },
       });
       if (r.sent > 0) res.sent++; else { res.failed++; logger.error({ phone, failed: r.failed, fcmError: r.fcmError }, '[CartReminder] Пуш не принят'); }
     } catch (err: any) {
@@ -198,7 +201,7 @@ export async function sendTestReminder(kind: ReminderKind, rawPhone: string): Pr
       body: reminderText(product.name, pct, { kind, firstName: firstNameOf(lastOrder[0]?.customerName), stock: product.shopStock }),
       imageUrl: firstImage(product),
       tokens: [rec.token],
-      data: { type: KIND[kind].dataType, screen: 'product', productId: String(product.id), sku: String(product.sku), shopArticle: String(product.shopArticle ?? '') },
+      data: { type: KIND[kind].dataType, screen: kind === 'cart' ? 'cart' : 'product', productId: String(product.id), sku: String(product.sku), shopArticle: String(product.shopArticle ?? '') },
     });
     return r.sent > 0
       ? { ok: true, message: `Отправлено: ${product.name}` }
