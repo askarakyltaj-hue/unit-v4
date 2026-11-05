@@ -4520,6 +4520,7 @@ async function loadMyMarketPrices() {
   }
 
   await renderMyMarketBannerSlots();
+  await initBannerTransitionSelect();
   await renderMyMarketUnderShowcase();
   await renderMyMarketStreets();
 }
@@ -4572,6 +4573,29 @@ function recalcMyMarketPriceRow(tr) {
  * (URL), заголовок, подзаголовок, ссылка на sku ИЛИ категорию, вкл/выкл.
  * 4 фиксированных слота, сервер всегда отдаёт ровно 4 записи.
  */
+// Переходы баннеров в приложении (главная и витрины) — сохраняются сразу при выборе.
+async function initBannerTransitionSelect() {
+  let cur = {};
+  try { cur = await api('/shop-admin/ui-settings'); } catch { /* оставляем как есть */ }
+  for (const [selId, stId] of [['mmBannerTransition', 'mmBannerTransitionStatus'], ['mmShowcaseTransition', 'mmShowcaseTransitionStatus'], ['mmCaptionEffect', 'mmCaptionEffectStatus']]) {
+    const sel = document.getElementById(selId);
+    const st = document.getElementById(stId);
+    if (!sel) continue;
+    sel.value = cur[sel.dataset.key] || sel.options[0].value;
+    if (sel.dataset.bound) continue;
+    sel.dataset.bound = '1';
+    sel.addEventListener('change', async () => {
+      st.textContent = 'Сохраняю…';
+      try {
+        await api('/shop-admin/ui-settings', { method: 'PUT', body: JSON.stringify({ [sel.dataset.key]: sel.value }) });
+        st.textContent = 'Сохранено — в приложении обновится при следующем открытии главной';
+      } catch (err) {
+        st.textContent = 'Ошибка: ' + err.message;
+      }
+    });
+  }
+}
+
 async function renderMyMarketBannerSlots(scrollToEnd = false) {
   const container = document.getElementById('mymarketBannerSlots');
   const banners = await api('/shop-admin/banners');
